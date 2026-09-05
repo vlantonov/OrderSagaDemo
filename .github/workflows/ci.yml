@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────────────────────────
+  # 1. Build, vet, and race-test the Go module
+  # ──────────────────────────────────────────────────────────
+  build-test:
+    name: Build · Vet · Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true            # caches $GOPATH/pkg/mod keyed on go.sum
+
+      - name: go build
+        run: go build ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test (race detector)
+        run: go test -race -count=1 ./...
+
+  # ──────────────────────────────────────────────────────────
+  # 2. Static analysis — golangci-lint (v1.60.x)
+  # ──────────────────────────────────────────────────────────
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.60.3        # matches tech-stack.md v1.60.x pin
+
+  # ──────────────────────────────────────────────────────────
+  # 3. Vulnerability scan — govulncheck
+  #
+  # D-3 accepted-risk decision: the demo has transitive CVEs in
+  # third-party dependencies that the PM has accepted as out-of-scope
+  # for this portfolio project.  We keep the scan running so findings
+  # remain visible in the Checks UI and CI logs, but continue-on-error
+  # prevents them from blocking merges.  Remove continue-on-error once
+  # the upstream packages ship fixes or the deps are updated.
+  # ──────────────────────────────────────────────────────────
+  vuln:
+    name: govulncheck (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: govulncheck
+        run: govulncheck ./...
+
+  # ──────────────────────────────────────────────────────────
+  # 4. Proto lint — buf (v1.35.x)
+  # ──────────────────────────────────────────────────────────
+  proto-lint:
+    name: buf lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.35.0"      # matches tech-stack.md v1.35.x pin
+
+      - name: buf lint
+        run: buf lint
+        working-directory: proto

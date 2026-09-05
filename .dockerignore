@@ -1,0 +1,32 @@
+# Docker build context excludes non-Go assets to keep the context lean.
+# The Dockerfiles use `COPY . .` from the repo root (R-5), so anything
+# required by `go build ./...` must NOT be listed here.
+
+# Version control
+.git
+.gitignore
+
+# CI / tooling configuration (not needed inside the image)
+.github
+.golangci.yml
+
+# Documentation
+docs
+README.md
+LICENSE
+
+# Deployment manifests and helper scripts
+deploy
+observability
+scripts
+
+# Dockerfile siblings — Docker injects the target Dockerfile separately
+# via `-f`; the services/ tree is not needed in the build context.
+services
+
+# Proto source files — generated Go stubs already live in internal/gen/
+proto
+
+# Project metadata files
+Makefile
+VERSION

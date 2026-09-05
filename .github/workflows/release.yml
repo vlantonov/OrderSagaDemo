@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/vladiant/ordersagademo
+
+jobs:
+  # ──────────────────────────────────────────────────────────
+  # 1. Validate Helm chart before any image work
+  # ──────────────────────────────────────────────────────────
+  helm-validate:
+    name: Helm lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - name: helm lint
+        run: helm lint deploy/helm/ordersagademo
+
+      - name: helm template
+        run: helm template ordersagademo deploy/helm/ordersagademo
+
+  # ──────────────────────────────────────────────────────────
+  # 2. Build multi-stage images and push to GHCR
+  #
+  # Build context is always the repo root (R-5).  Login and push
+  # are guarded so fork builds still compile the image locally
+  # without needing GITHUB_TOKEN write access to the registry.
+  # ──────────────────────────────────────────────────────────
+  docker-build-push:
+    name: Build & push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: helm-validate
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [order, payment, inventory]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        # Only runs in the canonical repo; forks skip this step.
+        if: github.repository == 'vladiant/ordersagademo'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .                                          # repo-root context (R-5)
+          file: services/${{ matrix.service }}/Dockerfile
+          # Push to GHCR only from the canonical repo; forks get a local build.
+          push: ${{ github.repository == 'vladiant/ordersagademo' }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.ref_name }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
