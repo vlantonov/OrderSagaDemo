@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ordersagademo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+        {{- include "ordersagademo.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: inventory-service
+          image: "{{ .Values.image.repository }}/inventory-service:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: inventory-service-config
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

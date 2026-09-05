@@ -10,7 +10,7 @@
 
 | Item | Choice | Rationale |
 |---|---|---|
-| Language | **Go 1.23** | First-class gRPC + Kafka + OTel SDK support; produces small static binaries ideal for distroless images; straightforward goroutine concurrency for saga handlers; fast builds; wide portfolio-reviewer familiarity. |
+| Language | **Go 1.22** | First-class gRPC + Kafka + OTel SDK support; produces small static binaries ideal for distroless images; straightforward goroutine concurrency for saga handlers; fast builds; wide portfolio-reviewer familiarity. (Pinned at 1.22 — the installed runtime is Go 1.22.2; `go.mod` declares `go 1.22`.) |
 | Module path | `github.com/vladiant/ordersagademo` | Matches the GitHub namespace; single Go module at repo root. |
 | Module layout | Single `go.mod` at repo root | All three services share generated proto code in `internal/gen/`; reduces toolchain ceremony for a demo. |
 
@@ -21,7 +21,7 @@
 | Item | Choice | Version / Notes |
 |---|---|---|
 | Build orchestration | **GNU Make** | Single `Makefile` at repo root with targets: `build`, `test`, `lint`, `proto`, `docker-build`, `compose-up`, `kind-deploy`. |
-| Go dependency manager | **Go modules** (`go mod`) | Built into Go 1.23; `go.sum` committed. |
+| Go dependency manager | **Go modules** (`go mod`) | Built into Go 1.22; `go.sum` committed. |
 | Proto toolchain | **buf** | `v1.35.x`; handles `buf lint`, `buf generate`, and breaking-change detection. |
 | Proto plugins (buf-managed) | `protoc-gen-go` v1.34, `protoc-gen-go-grpc` v1.4 | Declared in `buf.gen.yaml`; no system-level `protoc` required. |
 | Linter | **golangci-lint** | `v1.60.x`; config in `.golangci.yml` at repo root. Enabled linters: `errcheck`, `govet`, `staticcheck`, `goimports`, `revive`, `gosec`. |
@@ -36,7 +36,7 @@
 |---|---|---|
 | gRPC library | `google.golang.org/grpc` | `v1.64.x` |
 | Protobuf runtime | `google.golang.org/protobuf` | `v1.34.x` |
-| OTel gRPC interceptors | `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | `v0.53.x` |
+| OTel gRPC interceptors | `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | `v0.54.0` |
 
 The only `.proto` file is `proto/inventory/v1/inventory.proto`; generated Go stubs land in `internal/gen/inventory/v1/`.
 
@@ -59,14 +59,14 @@ All three signals (metrics, logs, traces) exported via OTLP/gRPC to the shared O
 
 | Package | Version |
 |---|---|
-| `go.opentelemetry.io/otel` | `v1.28.x` |
-| `go.opentelemetry.io/otel/sdk` | `v1.28.x` |
-| `go.opentelemetry.io/otel/sdk/log` | `v0.4.x` |
-| `go.opentelemetry.io/otel/sdk/metric` | `v1.28.x` |
-| `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc` | `v1.28.x` |
-| `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` | `v1.28.x` |
-| `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc` | `v0.4.x` |
-| `go.opentelemetry.io/contrib/propagators/b3` | `v1.28.x` (optional) |
+| `go.opentelemetry.io/otel` | `v1.29.0` |
+| `go.opentelemetry.io/otel/sdk` | `v1.29.0` |
+| `go.opentelemetry.io/otel/sdk/log` | `v0.5.0` |
+| `go.opentelemetry.io/otel/sdk/metric` | `v1.29.0` |
+| `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc` | `v1.29.0` |
+| `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` | `v1.29.0` |
+| `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc` | `v0.5.0` |
+| `go.opentelemetry.io/contrib/propagators/b3` | `v1.29.0` (optional) |
 | W3C TraceContext propagator | included in `go.opentelemetry.io/otel` | Used for gRPC and Kafka header injection |
 
 ---
@@ -90,7 +90,7 @@ All images are pinned to a specific tag. Pull happens at `docker compose build` 
 
 | Stage | Image | Notes |
 |---|---|---|
-| Build | `golang:1.23-alpine` | Go compiler + Alpine tools |
+| Build | `golang:1.22-alpine` | Go compiler + Alpine tools |
 | Runtime | `gcr.io/distroless/static-debian12` | No shell, no package manager; ~2 MB base; statically linked Go binary drops straight in |
 
 ---

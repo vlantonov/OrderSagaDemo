@@ -1,0 +1,15 @@
+apiVersion: v2
+name: ordersagademo
+description: Saga-pattern demo with Order, Payment, and Inventory services
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.28.0"
+keywords:
+  - saga
+  - distributed-transactions
+  - kafka
+  - grpc
+  - opentelemetry
+maintainers:
+  - name: vladiant

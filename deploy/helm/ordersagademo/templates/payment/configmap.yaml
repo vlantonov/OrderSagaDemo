@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ordersagademo.labels" . | nindent 4 }}
+data:
+  KAFKA_BROKERS: {{ .Values.kafka.bootstrapServers | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
+  KAFKA_CONSUMER_GROUP: {{ .Values.paymentService.consumerGroup | quote }}

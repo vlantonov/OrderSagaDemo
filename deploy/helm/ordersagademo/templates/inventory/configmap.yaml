@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ordersagademo.labels" . | nindent 4 }}
+data:
+  GRPC_ADDR: {{ .Values.inventoryService.grpcAddr | quote }}
+  KAFKA_BROKERS: {{ .Values.kafka.bootstrapServers | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
+  INVENTORY_FAIL_ITEM_PREFIX: {{ .Values.inventoryService.failItemPrefix | quote }}

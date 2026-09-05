@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-service-config
+  namespace: ordersagademo
+data:
+  GRPC_ADDR: ":9090"
+  KAFKA_BROKERS: "kafka:9092"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+  # R-6: set INVENTORY_FAIL_ITEM_PREFIX=FAIL_ to enable forced-failure demo path
+  INVENTORY_FAIL_ITEM_PREFIX: "FAIL_"

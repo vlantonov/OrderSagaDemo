@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: ordersagademo
+data:
+  KAFKA_BROKERS: "kafka:9092"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4317"
+  KAFKA_CONSUMER_GROUP: "payment-service"

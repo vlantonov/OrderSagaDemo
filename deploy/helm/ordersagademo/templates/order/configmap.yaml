@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ordersagademo.labels" . | nindent 4 }}
+data:
+  HTTP_ADDR: {{ .Values.orderService.httpAddr | quote }}
+  KAFKA_BROKERS: {{ .Values.kafka.bootstrapServers | quote }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
+  INVENTORY_GRPC_ADDR: {{ .Values.orderService.inventoryGrpcAddr | quote }}
+  KAFKA_CONSUMER_GROUP: {{ .Values.orderService.consumerGroup | quote }}

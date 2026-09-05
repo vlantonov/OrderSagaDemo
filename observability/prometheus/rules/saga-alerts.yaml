@@ -1,0 +1,34 @@
+groups:
+  - name: saga-alerts
+    interval: 30s
+    rules:
+      - alert: SagaCompensationRateHigh
+        expr: |
+          rate(saga_compensation_total[5m]) /
+          (rate(saga_orders_total[5m]) + 0.001) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Saga compensation rate is high ({{ $value | humanizePercentage }})"
+          description: "More than 10% of saga outcomes are compensations."
+
+      - alert: PaymentFailureRateHigh
+        expr: |
+          rate(saga_orders_total{status="failed"}[5m]) /
+          (rate(saga_orders_total[5m]) + 0.001) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Payment failure rate is high ({{ $value | humanizePercentage }})"
+          description: "More than 20% of orders are failing at the payment step."
+
+      - alert: OrderThroughputZero
+        expr: rate(saga_orders_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "No orders processed in the last 5 minutes"
+          description: "The order service may be idle or down."

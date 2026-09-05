@@ -1,0 +1,25 @@
+replicaCount: 1
+
+image:
+  repository: ordersagademo
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+kafka:
+  bootstrapServers: "kafka:9092"
+
+otel:
+  endpoint: "otel-collector:4317"
+
+orderService:
+  httpAddr: ":8080"
+  consumerGroup: "order-service"
+  inventoryGrpcAddr: "inventory-service:9090"
+
+paymentService:
+  consumerGroup: "payment-service"
+
+inventoryService:
+  grpcAddr: ":9090"
+  # R-6: set to empty string to disable forced-failure path
+  failItemPrefix: "FAIL_"

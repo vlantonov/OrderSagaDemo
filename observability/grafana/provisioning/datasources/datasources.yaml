@@ -1,0 +1,45 @@
+# Stable UIDs are referenced by dashboard JSON (R-4).
+# Do NOT change these UIDs once dashboards are deployed.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus-uid
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+
+  - name: Loki
+    type: loki
+    uid: loki-uid
+    url: http://loki:3100
+    access: proxy
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: "${__value.raw}"
+          datasourceUid: tempo-uid
+
+  - name: Tempo
+    type: tempo
+    uid: tempo-uid
+    url: http://tempo:3200
+    access: proxy
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki-uid
+        filterByTraceID: true
+        filterBySpanID: false
+      serviceMap:
+        datasourceUid: prometheus-uid
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki-uid
