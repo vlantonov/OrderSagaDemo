@@ -159,7 +159,7 @@ OrderSagaDemo/                        ← repo root / Docker build context for a
 ### `go.mod`
 ```
 module github.com/vladiant/ordersagademo
-go 1.23
+go 1.22
 ```
 All three service binaries and all internal packages live in this single module. Third-party dependencies declared here.
 

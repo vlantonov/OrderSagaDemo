@@ -34,7 +34,7 @@
 
 | Item | Choice | Version |
 |---|---|---|
-| gRPC library | `google.golang.org/grpc` | `v1.64.x` |
+| gRPC library | `google.golang.org/grpc` | `v1.65.0` |
 | Protobuf runtime | `google.golang.org/protobuf` | `v1.34.x` |
 | OTel gRPC interceptors | `go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc` | `v0.54.0` |
 

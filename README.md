@@ -6,11 +6,54 @@ A **Go 1.22** portfolio project demonstrating the **Saga orchestration pattern**
 
 ## Architecture
 
-- **Order Service** (`HTTP :8080` | Kafka | gRPC client) — owns the saga state machine; publishes `OrderCreated` / `CompensatePayment`; calls `ReserveInventory` gRPC.
+- **Order Service** (`HTTP :8080` | Kafka | gRPC client) — owns the saga state machine; publishes `OrderCreated` / `CompensatePayment`; calls `ReserveInventory` gRPC; exposes `GET /healthz` for liveness probes.
 - **Payment Service** (Kafka only) — stateless worker; consumes `OrderCreated` → emits `PaymentProcessed`; consumes `CompensatePayment` → emits `PaymentRefunded`.
 - **Inventory Service** (`gRPC :9090` | Kafka) — serves `ReserveInventory` / `ReleaseInventory`; emits `InventoryReserved` / `InventoryReleased` audit events.
 - **Kafka backbone** (KRaft, no Zookeeper) — topics auto-created on first produce (`KAFKA_AUTO_CREATE_TOPICS_ENABLE=true`, R-8).
 - **OTel → Collector → Prometheus / Loki / Tempo / Grafana** — all three services export OTLP/gRPC to a single collector that fans out to the observability backends.
+
+```mermaid
+graph TD
+    subgraph "Demo Client"
+        CLI([curl / script])
+    end
+
+    subgraph "Application Services"
+        OS["Order Service\n(HTTP :8080 | Kafka | gRPC client)"]
+        PS["Payment Service\n(Kafka only)"]
+        IS["Inventory Service\n(gRPC :9090 | Kafka)"]
+    end
+
+    subgraph "Event Backbone"
+        KF[(Kafka :9092\nKRaft, no Zookeeper)]
+    end
+
+    subgraph "Observability"
+        OC["OTel Collector\n(:4317 OTLP/gRPC in · :8889 scrape out)"]
+        PR["Prometheus\n(:9090)"]
+        LK["Loki\n(:3100)"]
+        TP["Tempo\n(:3200)"]
+        GF["Grafana\n(:3000)"]
+    end
+
+    CLI -->|"POST /orders"| OS
+    OS -->|"gRPC ReserveInventory"| IS
+    OS <-->|"produce / consume"| KF
+    PS <-->|"produce / consume"| KF
+    IS -->|"produce (audit events)"| KF
+
+    OS -->|"OTLP/gRPC :4317"| OC
+    PS -->|"OTLP/gRPC :4317"| OC
+    IS -->|"OTLP/gRPC :4317"| OC
+
+    OC -->|"scrape :8889"| PR
+    OC -->|"OTLP/gRPC"| TP
+    OC -->|"HTTP push"| LK
+
+    PR -->|"datasource"| GF
+    TP -->|"datasource"| GF
+    LK -->|"datasource"| GF
+```
 
 ---
 
@@ -145,13 +188,18 @@ sequenceDiagram
 
 | Target | Description |
 |--------|-------------|
-| `make generate` | Re-generate gRPC stubs from proto (requires buf) |
 | `make build` | `go build ./...` |
 | `make test` | `go test ./...` |
 | `make vet` | `go vet ./...` |
 | `make lint` | `golangci-lint run` |
-| `make up` | Start full Docker Compose stack |
-| `make down` | Stop and remove volumes |
+| `make ci` | Full local quality gate: build · vet · race-test · lint (matches CI) |
+| `make vuln` | `govulncheck ./...` — non-blocking; see Known Limitations |
+| `make generate` | Re-generate gRPC stubs from proto (requires buf) |
+| `make docker-build` | Build all three service images locally (`IMAGE_TAG=dev` by default) |
+| `make helm-lint` | `helm lint deploy/helm/ordersagademo` |
+| `make helm-template` | Dry-run Helm render to stdout |
+| `make up` | Start full Docker Compose stack (builds images if needed) |
+| `make down` | Stop stack and remove volumes |
 
 ---
 
@@ -164,3 +212,74 @@ kubectl apply -f deploy/kubernetes/
 # Helm
 helm install ordersagademo deploy/helm/ordersagademo --namespace ordersagademo --create-namespace
 ```
+
+---
+
+## Project Structure
+
+| Path | Description |
+|------|-------------|
+| `cmd/` | One `main.go` per service binary (order, payment, inventory) |
+| `internal/` | Application packages: saga, Kafka producers/consumers, gRPC server, telemetry, messaging |
+| `proto/` | gRPC contract (`inventory/v1/inventory.proto`); buf toolchain config |
+| `deploy/docker-compose/` | Full-stack Compose file |
+| `deploy/kubernetes/` | Plain Kubernetes manifests (Namespace, Deployment, Service, ConfigMap per service) |
+| `deploy/helm/ordersagademo/` | Helm chart (requires Kubernetes ≥ 1.28) |
+| `observability/` | Config files for OTel Collector, Prometheus, Loki, Tempo, and Grafana dashboards |
+| `scripts/` | `create-order.sh` (happy path) · `create-order-fail.sh` (compensation path) |
+| `docs/` | SRS, architecture design, project layout, tech stack, CI/CD pipeline, project status |
+
+See [docs/design/architecture.md](docs/design/architecture.md) for the full component design, saga state machine, Kafka event schemas, and gRPC contract. See [docs/design/project-layout.md](docs/design/project-layout.md) for the authoritative directory tree.
+
+---
+
+## CI / CD
+
+| Pipeline | Trigger | Jobs |
+|----------|---------|------|
+| CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) | Push / PR to `main` | Build → Vet → Race-test → golangci-lint → govulncheck (non-blocking) → buf lint |
+| Release ([`.github/workflows/release.yml`](.github/workflows/release.yml)) | Push of `v*.*.*` tag | Helm lint & template → build & push 3 service images to GHCR |
+
+Images published on release tags (canonical repo only):
+
+```
+ghcr.io/vladiant/ordersagademo-order:<tag>
+ghcr.io/vladiant/ordersagademo-payment:<tag>
+ghcr.io/vladiant/ordersagademo-inventory:<tag>
+```
+
+Run `make ci` to reproduce the build/vet/race-test/lint gate locally. See [docs/ci-cd/pipeline.md](docs/ci-cd/pipeline.md) for a detailed pipeline walkthrough.
+
+---
+
+## Known Limitations & Accepted Risks
+
+This is a **portfolio demo**, not a production system. The following security findings are **accepted risk (decision D-3)**. `govulncheck` runs in CI with `continue-on-error: true` so results remain visible without blocking merges.
+
+| Dependency | Advisory | Notes |
+|-----------|---------|-------|
+| `google.golang.org/grpc v1.65.0` | GO-2026-6061 | Awaiting upstream fix |
+| `go.opentelemetry.io/otel/sdk v1.29.0` | GO-2026-5426 | Awaiting upstream fix |
+| Go 1.22.2 stdlib | GO-2026-\* (various) | Toolchain upgrade deferred |
+
+Additional functional limitations:
+
+- **In-memory stores** — order state, payment ledger, and inventory stock are lost on restart.
+- **Single-broker Kafka** — replication factor 1; not suitable for production.
+- **No auth or TLS** — all service endpoints are unauthenticated plaintext.
+- **Topic auto-creation** — convenient for demo; not suitable where topic configuration matters.
+
+---
+
+## How This Was Built — SDLC Stages
+
+This project followed a structured, documented pipeline:
+
+| Stage | Artefact |
+|-------|----------|
+| 1. Requirements | [`docs/requirements/SRS.md`](docs/requirements/SRS.md) — functional requirements, acceptance criteria |
+| 2. Design | [`docs/design/architecture.md`](docs/design/architecture.md) · [`docs/design/project-layout.md`](docs/design/project-layout.md) · [`docs/tech-stack.md`](docs/tech-stack.md) |
+| 3. Implementation | Go 1.22 monorepo — three services, shared telemetry/messaging, gRPC stubs, Dockerfiles, Compose, Helm, Grafana dashboards |
+| 4. QA | Unit tests (race-detector clean) · golangci-lint PASS · buf lint PASS · govulncheck findings accepted (D-3) |
+| 5. Release / CI-CD | GitHub Actions CI on every push; release workflow publishes images to GHCR on `v*.*.*` tags |
+| 6. Documentation | This README · [`CHANGELOG.md`](CHANGELOG.md) · [`docs/ci-cd/pipeline.md`](docs/ci-cd/pipeline.md) · [`docs/status.md`](docs/status.md) |

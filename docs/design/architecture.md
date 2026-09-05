@@ -11,7 +11,7 @@
 
 | # | Question | Decision |
 |---|---|---|
-| **OQ-1** | Primary language | **Go 1.23** — static binaries, first-class gRPC/OTel/Kafka ecosystem, tiny distroless images, portfolio-friendly. |
+| **OQ-1** | Primary language | **Go 1.22** — static binaries, first-class gRPC/OTel/Kafka ecosystem, tiny distroless images, portfolio-friendly. |
 | **OQ-2** | Saga model | **Orchestration** — the Order Service owns the saga state machine and drives every step. Compensation logic is centralised, clearly visible in a single trace, and easy to follow in logs. No separate orchestrator binary; the Order Service is the orchestrator. |
 | **OQ-3** | Kafka serialisation | **JSON** with documented Go-struct schemas. No Schema Registry container; events are human-readable and inspectable with standard Kafka tools, which aids the portfolio demo story. |
 | **OQ-4** | OTel Collector topology | **Single shared OTel Collector** (one container in Compose, one Deployment in k8s). All three services export OTLP/gRPC to it; it fans out to Prometheus, Tempo, and Loki. |
@@ -62,7 +62,7 @@ graph TD
     PS -->|"OTLP/gRPC :4317"| OC
     IS -->|"OTLP/gRPC :4317"| OC
 
-    OC -->|"remote_write / scrape :8889"| PR
+    OC -->|"scrape :8889"| PR
     OC -->|"OTLP :4317"| TP
     OC -->|"OTLP :3100"| LK
 
@@ -397,7 +397,7 @@ Committed to `observability/prometheus/rules/saga-alerts.yaml`:
 ### 8.2 Multi-Stage Dockerfile Pattern (same structure for all three)
 
 ```
-Stage 1 — builder:  golang:1.23-alpine
+Stage 1 — builder:  golang:1.22-alpine
   WORKDIR /app
   COPY go.mod go.sum ./
   RUN go mod download
