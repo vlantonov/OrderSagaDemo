@@ -69,7 +69,6 @@ services:
       - ../../observability/prometheus/rules:/etc/prometheus/rules:ro
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--web.enable-remote-write-receiver"
       - "--storage.tsdb.retention.time=1h"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]

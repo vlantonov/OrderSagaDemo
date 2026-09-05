@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
-	kafkago "github.com/segmentio/kafka-go"
 	"github.com/google/uuid"
+	kafkago "github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -20,8 +21,8 @@ import (
 )
 
 const (
-	serviceName    = "ordersagademo/payment/kafka"
-	tracerName     = serviceName
+	serviceName = "ordersagademo/payment/kafka"
+	tracerName  = serviceName
 )
 
 // Worker combines the Kafka consumer (OrderCreated, CompensatePayment) and
@@ -30,7 +31,8 @@ type Worker struct {
 	readers  []*kafkago.Reader
 	writer   *kafkago.Writer
 	ledger   ledger.Ledger
-	seen     map[string]struct{} // event_id deduplication (R-1)
+	mu       sync.Mutex
+	seen     map[string]struct{} // event_id deduplication (guarded by mu) (R-1)
 	tracer   trace.Tracer
 	produced metric.Int64Counter
 	consumed metric.Int64Counter
@@ -115,11 +117,16 @@ func (w *Worker) handleMessage(ctx context.Context, msg kafkago.Message) {
 	}
 
 	// Idempotency (R-1).
-	if _, seen := w.seen[env.EventID]; seen {
+	w.mu.Lock()
+	_, alreadySeen := w.seen[env.EventID]
+	if !alreadySeen {
+		w.seen[env.EventID] = struct{}{}
+	}
+	w.mu.Unlock()
+	if alreadySeen {
 		slog.WarnContext(ctx, "duplicate event discarded", "event_id", env.EventID, "event_type", env.EventType)
 		return
 	}
-	w.seen[env.EventID] = struct{}{}
 
 	switch env.EventType {
 	case "OrderCreated":

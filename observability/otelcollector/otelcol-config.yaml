@@ -14,11 +14,6 @@ processors:
     send_batch_size: 512
 
 exporters:
-  prometheusremotewrite:
-    endpoint: "http://prometheus:9090/api/v1/write"
-    tls:
-      insecure: true
-
   otlp/tempo:
     endpoint: tempo:4317
     tls:
@@ -56,7 +51,7 @@ service:
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [prometheusremotewrite, prometheus]
+      exporters: [prometheus]
 
     logs:
       receivers: [otlp]

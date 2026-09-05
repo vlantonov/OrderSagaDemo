@@ -2,12 +2,14 @@ package saga_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	inventoryv1 "github.com/vladiant/ordersagademo/internal/gen/inventory/v1"
+	"github.com/vladiant/ordersagademo/internal/messaging"
 	"github.com/vladiant/ordersagademo/internal/order/saga"
 	"github.com/vladiant/ordersagademo/internal/order/store"
 )
@@ -143,6 +145,52 @@ func TestCompensationPath(t *testing.T) {
 	final, err := s.Get("order-003")
 	require.NoError(t, err)
 	assert.Equal(t, store.StateCompensated, final.State)
+}
+
+// TestStartSagaPreservesEventID verifies that the OrderCreated event published by
+// StartSaga carries exactly the eventID provided by the caller (R-7 stable event_id).
+func TestStartSagaPreservesEventID(t *testing.T) {
+	pub := &fakePublisher{}
+	inv := &fakeInventory{}
+	orch := newOrchestrator(t, pub, inv)
+	ctx := context.Background()
+
+	const wantEventID = "stable-evt-id-001"
+	order := store.Order{
+		ID:    "order-evt",
+		Items: []store.Item{{ItemID: "item-X", Quantity: 1}},
+	}
+	require.NoError(t, orch.StartSaga(ctx, order, wantEventID))
+
+	require.Len(t, pub.published, 1)
+	evt, ok := pub.published[0].payload.(messaging.OrderCreatedEvent)
+	require.True(t, ok, "published payload must be an OrderCreatedEvent")
+	assert.Equal(t, wantEventID, evt.EventID, "event_id must equal the caller-provided ID")
+}
+
+// TestCompensationOnGRPCError verifies that a gRPC transport error (not a business
+// failure) also triggers the compensation path.
+func TestCompensationOnGRPCError(t *testing.T) {
+	pub := &fakePublisher{}
+	inv := &fakeInventory{err: fmt.Errorf("connection refused")}
+	s := store.NewMemoryStore()
+	orch := newOrchestatorWithStore(t, s, pub, inv)
+	ctx := context.Background()
+
+	order := store.Order{
+		ID:    "order-grpcerr",
+		Items: []store.Item{{ItemID: "item-A", Quantity: 1}},
+	}
+	require.NoError(t, orch.StartSaga(ctx, order, "evt-grpcerr"))
+	require.NoError(t, orch.OnPaymentProcessed(ctx, "order-grpcerr", "pay-grpcerr"))
+
+	o, err := s.Get("order-grpcerr")
+	require.NoError(t, err)
+	assert.Equal(t, store.StateCompensating, o.State, "gRPC error must trigger compensation")
+
+	// CompensatePayment must have been published.
+	require.Len(t, pub.published, 2)
+	assert.Equal(t, "saga.payments.compensate", pub.published[1].topic)
 }
 
 // TestIdempotentCompensation verifies that calling OnPaymentRefunded twice does not

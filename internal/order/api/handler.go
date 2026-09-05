@@ -19,9 +19,9 @@ const handlerTracer = "ordersagademo/order/api"
 
 // CreateOrderRequest is the JSON body for POST /orders.
 type CreateOrderRequest struct {
-	OrderID       string     `json:"order_id"`
-	Items         []Item     `json:"items"`
-	PaymentAmount float64    `json:"payment_amount"`
+	OrderID       string  `json:"order_id"`
+	Items         []Item  `json:"items"`
+	PaymentAmount float64 `json:"payment_amount"`
 }
 
 // Item pairs item_id with a quantity.
@@ -49,6 +49,11 @@ func NewHandler(orch *saga.Orchestrator) *Handler {
 // ServeHTTP routes requests.
 func (h *Handler) ServeHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("POST /orders", h.createOrder)
+	mux.HandleFunc("GET /healthz", h.healthz)
+}
+
+func (h *Handler) healthz(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {

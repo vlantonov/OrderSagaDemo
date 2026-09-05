@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"sync"
 
 	kafkago "github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
@@ -22,7 +23,8 @@ const consumerTracer = "ordersagademo/order/kafka/consumer"
 type Consumer struct {
 	readers      []*kafkago.Reader
 	orchestrator *saga.Orchestrator
-	seen         map[string]struct{} // event_id deduplication
+	mu           sync.Mutex
+	seen         map[string]struct{} // event_id deduplication (guarded by mu)
 	counter      metric.Int64Counter
 }
 
@@ -96,11 +98,16 @@ func (c *Consumer) handleMessage(ctx context.Context, msg kafkago.Message) {
 	}
 
 	// Idempotency: discard duplicates (R-1).
-	if _, seen := c.seen[env.EventID]; seen {
+	c.mu.Lock()
+	_, alreadySeen := c.seen[env.EventID]
+	if !alreadySeen {
+		c.seen[env.EventID] = struct{}{}
+	}
+	c.mu.Unlock()
+	if alreadySeen {
 		slog.WarnContext(ctx, "duplicate event discarded", "event_id", env.EventID, "event_type", env.EventType)
 		return
 	}
-	c.seen[env.EventID] = struct{}{}
 
 	switch env.EventType {
 	case "PaymentProcessed":
