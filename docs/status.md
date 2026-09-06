@@ -70,7 +70,13 @@ The ADR-003 ruling was executed as a single coordinated upgrade pass. It passed 
 
 **ADR status after this pass:** ADR-001 **Done**, ADR-002 **Superseded by ADR-003**, ADR-003 **Done (amended)**. **D-3 retired** (0 called vulns).
 
-**Tracked follow-up (not lost):** the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path) is still not unit-tested. QA also notes several packages (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) lack direct unit coverage — a known coverage gap, non-blocking for this pass.
+**Tracked follow-up (not lost):** ~~the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path) is still not unit-tested.~~ **RESOLVED (2026-09-06)** — now covered by `TestCompensationOnInvalidQuantity` (commit `e9ede1f`); see the Maintenance Pass below. QA still notes several packages (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) lack direct unit coverage — a known coverage gap, non-blocking for this pass.
+
+---
+
+## Maintenance Pass — Compensation-Branch Test Added (2026-09-06)
+
+A test-only change landed on `main` (commit `e9ede1f`): `TestCompensationOnInvalidQuantity` was added to `internal/order/saga/orchestrator_test.go`, covering the out-of-range-quantity → compensation branch in `buildReserveRequest` (error → compensation path). This closes the last tracked coverage-gap follow-up from the CI lint-regression fix. No source or behavioural change; `VERSION` unchanged. The broader multi-package coverage gap (`telemetry`, inventory gRPC server, Kafka consumers, `cmd/*`) remains open — see Next Steps.
 
 ---
 
@@ -85,7 +91,7 @@ The ADR-003 ruling was executed as a single coordinated upgrade pass. It passed 
 - `buf lint` — PASS
 - `govulncheck ./...` — **0 called vulnerabilities**; the CI `vuln` job is now **blocking** (`continue-on-error` removed)
 
-*Note:* test gaps are tracked (non-blocking) — the out-of-range-quantity compensation branch in `buildReserveRequest` is still not unit-tested (see Next Steps), and several packages (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) remain without direct unit coverage.
+*Note:* the out-of-range-quantity compensation branch in `buildReserveRequest` is now unit-tested (`TestCompensationOnInvalidQuantity`, commit `e9ede1f`, 2026-09-06). One coverage gap remains (non-blocking): several packages — `telemetry`, the inventory gRPC server, the Kafka consumers (`internal/order/kafka`, `internal/payment/kafka`), and `cmd/*/main.go` — remain without direct unit coverage (see Next Steps).
 
 **D-3 — RESOLVED (ADR-003 implemented, 2026-09-06).**
 
@@ -152,10 +158,10 @@ All previously flagged stale references have been corrected by the Technical Wri
 ## Next Steps
 
 1. **Release step** — bump `VERSION`, tag, and push to trigger the release workflow (deferred; `VERSION` currently stays `0.2.0`). The version bump for the Go 1.25 + dependency + linter upgrade is a separate release decision.
-2. **QA follow-up (test-only)** — add the missing unit test for the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path). **Still open.**
-3. **Coverage gap (test-only, non-blocking)** — add direct unit coverage for `telemetry`, the inventory gRPC server, the Kafka consumers, and `cmd/*`, which QA flagged as untested.
+2. **Coverage gap (test-only, non-blocking)** — add direct unit coverage for `telemetry`, the inventory gRPC server, the Kafka consumers (`internal/order/kafka`, `internal/payment/kafka`), and `cmd/*/main.go` (compilation-only today), which QA flagged as untested.
 
 **Resolved (no longer open):**
 
+- **QA follow-up (test-only) — out-of-range-quantity compensation branch** — RESOLVED (2026-09-06). The error → compensation path in `buildReserveRequest` is now covered by `TestCompensationOnInvalidQuantity` in `internal/order/saga/orchestrator_test.go` (commit `e9ede1f`). This closes the specific coverage-gap follow-up tracked since the CI lint-regression fix; the broader multi-package coverage gap above remains open and distinct.
 - **Go 1.25 bump (ADR-003)** — shipped; see the Maintenance Pass above. `govulncheck ./...` clean, all gates green, D-3 retired, ADR-002 superseded.
 - **golangci-lint v1 → v2 (ADR-001)** — shipped (`v2.13.2` + `golangci-lint-action@v9`); the Node-20 deprecation warning on the `lint` job is cleared.
