@@ -1,7 +1,7 @@
 ---
 name: Technical Writer
 description: Updates README, CHANGELOG, and project status docs to match what actually shipped, and drafts portfolio-facing writeups (blog posts, reference pieces) for notable work - the Documentation stage of the SDLC, run after Deployment or Maintenance.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [read/readFile, search/codebase, search, edit, web/fetch]
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: Release Engineer
 description: Owns CI/CD pipelines, packaging, and release/versioning for the portfolio project once QA has signed off - the Deployment stage of the SDLC, driven by the project's declared tech stack.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [execute, read/readFile, search/codebase, search, edit, vscodeGeneral/usages, web/fetch]
 ---
 

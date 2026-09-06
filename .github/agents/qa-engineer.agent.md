@@ -1,7 +1,7 @@
 ---
 name: QA Engineer
 description: Verifies implemented code against the SRS and design doc by running and extending the test suite declared in the project's tech stack, covering unit, integration, and regression testing, and reporting defects.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [execute, read/readFile, search/codebase, search, edit, vscodeGeneral/usages]
 ---
 

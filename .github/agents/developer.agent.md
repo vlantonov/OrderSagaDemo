@@ -1,7 +1,7 @@
 ---
 name: Developer
 description: Implements code strictly against the System Architect's design doc, using the project's declared build system and dependency manager, following the language's idiomatic ownership/error-handling conventions, and writing accompanying unit tests in the project's declared test framework.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [execute, read/readFile, search/codebase, search, edit, vscodeGeneral/usages, vscodeGeneral/rename, web/fetch]
 ---
 

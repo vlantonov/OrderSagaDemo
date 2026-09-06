@@ -1,7 +1,7 @@
 ---
 name: System Architect
 description: Turns an approved SRS into a concrete design (architecture, module boundaries, target/package layout, key interfaces) before implementation begins, and establishes or confirms the project's tech stack.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [read/readFile, search/codebase, search, edit, web/fetch]
 ---
 

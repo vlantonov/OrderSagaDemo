@@ -1,7 +1,7 @@
 ---
 name: Maintenance Engineer
 description: Handles post-release bug fixes, dependency/version updates, performance tuning, and small enhancements for an already-shipped portfolio project - the Maintenance stage of the SDLC, driven by the project's declared tech stack.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [execute, read/readFile, search/codebase, search, edit, vscodeGeneral/usages, vscodeGeneral/rename]
 ---
 

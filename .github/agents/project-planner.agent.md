@@ -1,7 +1,7 @@
 ---
 name: Project Planner
 description: Acts as Project Manager for a portfolio project - scopes the work, sequences the other SDLC agents (Requirements Analyst, System Architect, Developer, QA Engineer, Release Engineer, Maintenance Engineer, Technical Writer), and tracks what stage a change is in, independent of the project's language or stack.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [execute, read/readFile, search/codebase, search, edit, agent]
 agents: ["Requirements Analyst", "System Architect", "Developer", "QA Engineer", "Release Engineer", "Maintenance Engineer", "Technical Writer"]
 ---

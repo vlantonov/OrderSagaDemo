@@ -1,7 +1,7 @@
 ---
 name: Requirements Analyst
 description: Gathers, clarifies, and documents functional and non-functional requirements for a new or existing portfolio project, producing a lightweight SRS before any design or code work starts.
-model: Claude Sonnet 4.6
+model: Claude Sonnet 4.8
 tools: [read/readFile, search/codebase, search, edit, web/fetch]
 ---
 
