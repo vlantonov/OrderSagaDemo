@@ -61,7 +61,8 @@ Runs `govulncheck ./...` to scan for known CVEs in the dependency graph. The job
 
 ```bash
 make vuln
-# govulncheck is installed via: go install golang.org/x/vuln/cmd/govulncheck@latest
+# govulncheck is installed via: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+# Pinned to v1.1.4 (ADR-002): last x/vuln release requiring <= Go 1.22.
 ```
 
 ### Job 4 — buf lint (`proto-lint`)

@@ -1,6 +1,6 @@
 # Tech Stack — OrderSagaDemo
 
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Date:** 2026-09-06  
 **Owner:** System Architect  
 
@@ -25,7 +25,7 @@
 | Proto toolchain | **buf** | `v1.35.x`; handles `buf lint`, `buf generate`, and breaking-change detection. |
 | Proto plugins (buf-managed) | `protoc-gen-go` v1.34, `protoc-gen-go-grpc` v1.4 | Declared in `buf.gen.yaml`; no system-level `protoc` required. |
 | Linter | **golangci-lint** | **Active pin: `v1.60.x`** (config schema v1) via `golangci-lint-action@v6`; config in `.golangci.yml` at repo root. Enabled linters: `errcheck`, `govet`, `staticcheck`, `goimports`, `revive`, `gosec`. Migration to **golangci-lint v2** (+ `golangci-lint-action@v7/v8`) is **approved-but-scheduled** — see §12 ADR-001. |
-| Security scan | **govulncheck** | `latest` via `go install golang.org/x/vuln/cmd/govulncheck@latest`; run in `make vuln`. |
+| Security scan | **govulncheck** | **Pinned: `golang.org/x/vuln/cmd/govulncheck@v1.1.4`** — the last `x/vuln` release whose `go.mod` requires ≤ Go 1.22 — via `go install golang.org/x/vuln/cmd/govulncheck@v1.1.4`; run in `make vuln`. **Do NOT use `@latest`:** `x/vuln@v1.7.0` requires Go ≥ 1.25 and fails to install under the Go 1.22 toolchain (`GOTOOLCHAIN=local`). Pin verified/confirmed via the procedure in §12 ADR-002. |
 | Formatter | `gofmt` / `goimports` | Enforced by golangci-lint; no separate step needed. |
 
 ---
@@ -171,3 +171,45 @@ The QA Engineer must be able to run all of the following without any setup beyon
 - **CI:** bump `golangci/golangci-lint-action@v6 → v7/v8` in `.github/workflows/ci.yml` (and `release.yml` if it runs lint); confirm the Node-20 warning is gone.
 - **gosec re-check (verify, don't assume):** v2 bundles a newer gosec that *may* change G115 behaviour. Re-evaluate whether the justified `//nolint:gosec` on the bounds-checked `int → int32` conversion in `buildReserveRequest` (saga reserve step) can be removed, and re-triage any newly surfaced findings before enabling.
 - **Acceptance criteria:** `make lint` (`golangci-lint run ./...`) passes clean on the v2 toolchain; no new suppressed findings introduced without written justification; the `lint` CI job runs without the Node-20 deprecation warning; §2 + this ADR updated to reflect the shipped versions and `Status: Done`.
+
+### ADR-002 — Pin govulncheck to a Go-1.22-compatible release (CI `security`/vuln step failure)
+
+**Date:** 2026-09-06 **Owner:** System Architect **Status:** ✅ Approved — **Adopt now**
+
+**Context.** The CI `security`/vuln step (`go install golang.org/x/vuln/cmd/govulncheck@latest`) began failing:
+
+```
+golang.org/x/vuln/cmd/govulncheck@latest: golang.org/x/vuln@v1.7.0
+requires go >= 1.25.0 (running go 1.22.12; GOTOOLCHAIN=local)
+Error: Process completed with exit code 1
+```
+
+`x/vuln@v1.7.0` raised its own `go.mod` `go` directive to `1.25.0`. Because CI runs `GOTOOLCHAIN=local` (§1) it will **not** auto-download a newer toolchain, so the `go install` fails outright under Go 1.22. The floating `@latest` is the moving part that broke; §1 pins the runtime at **Go 1.22** and `docs/status.md` records a **D-3 accepted risk** deferring the Go 1.22.2 stdlib toolchain upgrade.
+
+**Decision.** Replace the floating `@latest` with a **specific pinned version** of `golang.org/x/vuln/cmd/govulncheck` whose module `go.mod` requires **≤ Go 1.22**. The declared pin is **`v1.1.4`** (the last `v1.1.x` release, predating the `go ≥ 1.25` bump in the `v1.7.0` line). Go 1.22 (§1) is retained; the D-3 deferral is **left intact**.
+
+**Rationale / trade-off.**
+- **Root cause is the floating `@latest`, not Go 1.22.** Pinning CI tooling is standard practice; it makes the security gate reproducible and removes the moving target.
+- **The vuln gate is advisory, not blocking** — it runs `continue-on-error: true` (see `docs/status.md`), so the acceptable cost of pinning (a periodically-stale scanner that must be manually rolled forward) does not gate merges or releases.
+- **Honors D-3.** Option **(B) bump Go ≥ 1.25** was rejected: it would reverse an explicitly-deferred, accepted risk as a side effect of a tool-install error, force a full recompile/retest, require re-verifying the six linters and the justified gosec `//nolint` (ADR-001), and stack a second toolchain migration on top of the already-scheduled golangci-lint v1→v2 work — large blast radius for no reviewer-visible benefit today. A Go bump remains a valid *future* decision, but must be made deliberately (jointly retiring D-3), not here.
+- Option **(C)** (make the step tolerant / pin *and* schedule a Go bump) was rejected as either redundant (the step is already `continue-on-error`) or as smuggling in the deferred Go decision.
+
+**Verification the implementer MUST run before shipping the pin** (do not assume the version number):
+
+```bash
+go list -m -versions golang.org/x/vuln          # enumerate all published tags
+# For each candidate, highest-first, inspect its go.mod 'go' directive:
+go mod download golang.org/x/vuln@vX.Y.Z
+awk '/^go /{print}' "$(go env GOMODCACHE)/cache/download/golang.org/x/vuln/@v/vX.Y.Z.mod"
+# Pin the HIGHEST version whose 'go' directive is <= 1.22.
+```
+
+If `v1.1.4` is not the highest ≤ Go 1.22 release (or fails to install under Go 1.22), pin the verified highest compatible release instead and update the §2 Security-scan row to match.
+
+**Trigger to revisit.** Any of: (a) the project performs the deferred Go toolchain bump (retiring D-3), at which point govulncheck may return to a current pinned release ≥ its new floor; (b) a critical advisory requires a scanner feature only present in a Go-1.25+ govulncheck; (c) the pinned release is retracted/yanked.
+
+**Implementation scope (separate pass — do NOT implement here):**
+- **`Makefile`** — `make vuln` target: change the govulncheck install from `@latest` to the pinned `@v1.1.4` (post-verification).
+- **`.github/workflows/*.yml`** — the `go install golang.org/x/vuln/cmd/govulncheck@latest` line in the `security`/vuln step: change to the pinned version. Keep the step's `continue-on-error: true`.
+- **`go.mod`** — **no change** (this ADR deliberately does *not* touch the Go version; that stays §1 / Go 1.22).
+- **Acceptance criteria:** the CI `security`/vuln step **installs and runs cleanly under Go 1.22** (`GOTOOLCHAIN=local`); `make vuln` (`govulncheck ./...`) executes without the `requires go >= 1.25.0` install error; the D-3 accepted-risk findings continue to surface as advisory output; §2 + this ADR updated with the final verified version and `Status: Done`.

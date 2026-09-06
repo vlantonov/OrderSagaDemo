@@ -71,7 +71,9 @@ jobs:
           cache: true
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        # Pinned to v1.1.4 (ADR-002): last x/vuln release whose go.mod requires
+        # <= Go 1.22; @latest (v1.7.0) requires Go >= 1.25 and fails under 1.22.
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
       - name: govulncheck
         run: govulncheck ./...

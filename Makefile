@@ -46,6 +46,8 @@ ci:
 	golangci-lint run
 
 # Security scan — non-blocking by convention (D-3 accepted risk).
+# govulncheck pinned to v1.1.4 (ADR-002): the last x/vuln release whose go.mod
+# requires <= Go 1.22; @latest (v1.7.0) requires Go >= 1.25 and fails to install.
 vuln:
-	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 	govulncheck ./...
