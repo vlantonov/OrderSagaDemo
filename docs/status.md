@@ -2,7 +2,7 @@
 
 **Version:** 0.2.0  
 **Date:** 2026-09-06  
-**Current stage:** Maintenance — CI lint-regression fix landed on `main`; docs updated (release of `v0.2.1` deferred)
+**Current stage:** Maintenance — two CI-regression fixes landed on `main` (lint, then vuln-install); docs updated (release of `v0.2.1` deferred)
 
 ---
 
@@ -11,9 +11,9 @@
 | Stage | Status | Artefact |
 |-------|--------|---------|
 | Requirements | ✅ Complete | `docs/requirements/SRS.md` v0.1.0 |
-| Design | ✅ Complete | `docs/design/architecture.md` v0.1.0, `docs/design/project-layout.md` v0.1.0, `docs/tech-stack.md` v0.1.0 |
+| Design | ✅ Complete | `docs/design/architecture.md` v0.1.0, `docs/design/project-layout.md` v0.1.0, `docs/tech-stack.md` v0.3.0 (ADR-002 recorded in §12) |
 | Implementation | ✅ Complete | Go 1.22 monorepo — three services, shared telemetry/messaging, gRPC stubs, Dockerfiles, Compose, Helm, Grafana dashboards |
-| QA | ✅ **PASS (with notes)** — D-3 accepted risk + one tracked test gap (see below) | Unit tests race-detector clean; golangci-lint PASS (re-fixed 2026-09-06); buf lint PASS; govulncheck non-blocking |
+| QA | ✅ **PASS (with notes)** — D-3 accepted risk + one tracked test gap (see below) | Unit tests race-detector clean; golangci-lint PASS (re-fixed 2026-09-06); buf lint PASS; govulncheck non-blocking (install pinned to `@v1.1.4`, ADR-002) |
 | Release / CI-CD | ✅ Complete | `.github/workflows/ci.yml`, `.github/workflows/release.yml`; images pushed to GHCR on `v*.*.*` tags |
 | Documentation | ✅ Complete | `README.md`, `CHANGELOG.md`, `docs/ci-cd/pipeline.md`, `docs/status.md` (this file) |
 
@@ -32,6 +32,19 @@ A `semver(patch)` maintenance fix landed on `main` (commit `e5106c9`) restoring 
 
 1. **Non-blocking QA follow-up (test-only):** add a unit test covering the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path). QA verdict is **PASS-with-notes** on account of this gap.
 2. **Deferred stack decision — for System Architect:** fully clearing the Node-20 deprecation warning on the `lint` job requires bumping `golangci/golangci-lint-action` to v7/v8, which in turn requires golangci-lint `v1.60.x → v2` plus a `.golangci.yml` schema migration — a tech-stack change. Currently deferred; the action is left at `v6`.
+
+---
+
+## Maintenance Pass — CI Vuln-Install Fix (2026-09-06)
+
+A `semver(patch)` maintenance fix landed on `main` (commit `866f49e`) restoring a working CI `vuln` job. `VERSION` remains `0.2.0`; the `v0.2.1` bump + tag + push is still deferred to a separate release step. See the `[Unreleased]` **Fixed** entry in `CHANGELOG.md` and `docs/tech-stack.md` §12 (**ADR-002**) for full detail.
+
+- **govulncheck install failure resolved — the `vuln` job installs cleanly under Go 1.22.**
+  - The step used `go install golang.org/x/vuln/cmd/govulncheck@latest`, which resolved to `x/vuln v1.7.0`; that release raised its module `go` directive to `1.25.0`, so `go install` aborted with `requires go >= 1.25.0` under the pinned Go 1.22 toolchain (`GOTOOLCHAIN=local`).
+  - **Fix (ADR-002, `docs/tech-stack.md` §12):** pin govulncheck to **`@v1.1.4`** — verified by both Maintenance and QA as the highest `x/vuln` release whose module `go` directive is `≤ 1.22` (`v1.2.0`–`v1.7.0` all declare `go 1.25.0`). Applied in `make vuln` (`Makefile`), the CI workflow (`.github/workflows/ci.yml`), and `docs/ci-cd/pipeline.md`. The vuln step stays non-blocking (`continue-on-error: true`).
+  - **Go stays pinned at 1.22** — the D-3 toolchain-upgrade deferral is honoured; the fix pins the *tool*, not the *language*.
+
+**Status:** resolved — no new open follow-up. QA verdict **PASS**; all regression gates green (`go build`, `go vet`, `go test -race`, `golangci-lint run`).
 
 ---
 
