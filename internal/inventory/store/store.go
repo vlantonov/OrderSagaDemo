@@ -41,7 +41,7 @@ type reservationRecord struct {
 // MemoryStore is a thread-safe in-memory stock store.
 type MemoryStore struct {
 	mu           sync.Mutex
-	stock        map[string]*stockEntry     // item_id → stock
+	stock        map[string]*stockEntry       // item_id → stock
 	reservations map[string]reservationRecord // reservation_id → record
 }
 

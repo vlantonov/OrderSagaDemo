@@ -17,7 +17,7 @@ jobs:
     name: Helm lint & template
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: azure/setup-helm@v4
 
@@ -45,7 +45,7 @@ jobs:
       matrix:
         service: [order, payment, inventory]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Log in to GHCR
         # Only runs in the canonical repo; forks skip this step.

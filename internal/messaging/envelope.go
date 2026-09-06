@@ -11,8 +11,8 @@ import (
 // Producers must populate all fields; consumers validate them.
 type Envelope struct {
 	EventType    string       `json:"event_type"`
-	EventID      string       `json:"event_id"`       // idempotency key (UUID, generated once per message)
-	Timestamp    string       `json:"timestamp"`      // RFC3339
+	EventID      string       `json:"event_id"`  // idempotency key (UUID, generated once per message)
+	Timestamp    string       `json:"timestamp"` // RFC3339
 	TraceContext TraceContext `json:"trace_context"`
 }
 

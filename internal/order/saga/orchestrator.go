@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -39,8 +40,8 @@ type Orchestrator struct {
 	tracer    trace.Tracer
 	meter     metric.Meter
 
-	ordersTotal      metric.Int64Counter
-	stepDuration     metric.Float64Histogram
+	ordersTotal       metric.Int64Counter
+	stepDuration      metric.Float64Histogram
 	compensationTotal metric.Int64Counter
 }
 
@@ -142,7 +143,17 @@ func (o *Orchestrator) OnPaymentProcessed(ctx context.Context, orderID, paymentI
 		return fmt.Errorf("get order: %w", err)
 	}
 
-	req := buildReserveRequest(order)
+	req, err := buildReserveRequest(order)
+	if err != nil {
+		// Unfulfillable request (e.g. quantity out of range); payment already
+		// taken, so compensate rather than leaving the order stuck in RESERVING.
+		span.RecordError(err)
+		slog.WarnContext(ctx, "invalid reservation request — compensating",
+			"order_id", orderID,
+			"error", err.Error(),
+		)
+		return o.beginCompensation(ctx, orderID, paymentID, fmt.Sprintf("invalid request: %v", err))
+	}
 	resp, err := o.inventory.ReserveInventory(ctx, req)
 	if err != nil {
 		// Network / infrastructure error — enter compensation immediately.
@@ -238,16 +249,22 @@ func (o *Orchestrator) beginCompensation(ctx context.Context, orderID, paymentID
 	return nil
 }
 
-func buildReserveRequest(order store.Order) *inventoryv1.ReserveInventoryRequest {
+func buildReserveRequest(order store.Order) (*inventoryv1.ReserveInventoryRequest, error) {
 	items := make([]*inventoryv1.ItemQuantity, len(order.Items))
 	for i, it := range order.Items {
+		qty := it.Quantity
+		if qty < 0 || qty > math.MaxInt32 {
+			return nil, fmt.Errorf("item %q quantity %d out of int32 range", it.ItemID, qty)
+		}
 		items[i] = &inventoryv1.ItemQuantity{
-			ItemId:   it.ItemID,
-			Quantity: int32(it.Quantity),
+			ItemId: it.ItemID,
+			// qty is bounds-checked to [0, math.MaxInt32] above; gosec v2.20 (G115)
+			// cannot see the guard, so the conversion is safe despite the finding.
+			Quantity: int32(qty), //nolint:gosec // G115: guarded by the range check above
 		}
 	}
 	return &inventoryv1.ReserveInventoryRequest{
 		OrderId: order.ID,
 		Items:   items,
-	}
+	}, nil
 }

@@ -64,6 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/design/project-layout.md` — authoritative directory tree.
 - `docs/tech-stack.md` — language, framework, and image version pinning.
 
+### Fixed
+
+- **CI `lint` job (golangci-lint) now passes on `main`.**
+  - `goimports` (`-local github.com/vladiant/ordersagademo`) / `gofmt` violations corrected in `internal/inventory/store/store.go`, `internal/messaging/envelope.go`, `internal/order/saga/orchestrator.go`, and `internal/inventory/grpc/server.go` (import grouping, struct-field alignment, and a trailing-comment reformat). No behavioural change.
+  - **gosec G115 (integer overflow `int → int32`)** in the saga reserve step (`buildReserveRequest`): order-item quantities are now bounds-checked to `[0, math.MaxInt32]` before the `int32` conversion. An out-of-range quantity now returns an error and drives saga compensation (payment already taken), consistent with the existing reservation-failure path. A `//nolint:gosec` is retained on the guarded conversion because gosec v2.20 (pinned via golangci-lint v1.60.x) cannot see the preceding guard; the runtime check is the real fix.
+
+### Changed
+
+- **CI/CD workflows** — bumped Node-20-era GitHub Actions to their Node-24-compatible majors to clear the "Node 20 is being deprecated" warning: `actions/checkout@v4 → v5` and `actions/setup-go@v5 → v6` (`.github/workflows/ci.yml`, `.github/workflows/release.yml`). `golangci/golangci-lint-action` is intentionally left at `v6`: its Node-24 majors (v7/v8) require golangci-lint v2 and a `.golangci.yml` schema migration, which conflicts with the `v1.60.x` pin in `docs/tech-stack.md`. Bumping it is deferred pending an explicit tech-stack decision.
+
 ### Security — Accepted Risk (D-3)
 
 The following vulnerabilities are flagged by `govulncheck` and accepted as out-of-scope for this portfolio demo iteration. `govulncheck` runs in CI as a non-blocking job so findings remain visible.

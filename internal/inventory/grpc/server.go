@@ -3,18 +3,17 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	kafkago "github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-
-	kafkago "github.com/segmentio/kafka-go"
-	"github.com/google/uuid"
-	"encoding/json"
 
 	inventoryv1 "github.com/vladiant/ordersagademo/internal/gen/inventory/v1"
 	"github.com/vladiant/ordersagademo/internal/inventory/store"
@@ -26,10 +25,10 @@ const tracerName = "ordersagademo/inventory/grpc"
 // Server implements inventoryv1.InventoryServiceServer.
 type Server struct {
 	inventoryv1.UnimplementedInventoryServiceServer
-	stock         store.Store
-	failPrefix    string // INVENTORY_FAIL_ITEM_PREFIX (R-6)
-	kafkaWriter   *kafkago.Writer
-	grpcHandled   metric.Int64Counter
+	stock       store.Store
+	failPrefix  string // INVENTORY_FAIL_ITEM_PREFIX (R-6)
+	kafkaWriter *kafkago.Writer
+	grpcHandled metric.Int64Counter
 }
 
 // NewServer constructs a Server.
@@ -60,9 +59,8 @@ func NewServer(stock store.Store, failPrefix string, brokers []string) (*Server,
 
 // ReserveInventory checks stock and reserves items, or returns failure for forced-failure items (R-6).
 func (s *Server) ReserveInventory(ctx context.Context, req *inventoryv1.ReserveInventoryRequest) (*inventoryv1.ReserveInventoryResponse, error) {
-	ctx, span := otel.Tracer(tracerName).Start(ctx, "InventoryService.ReserveInventory",
-		// otelgrpc interceptor already starts the span; this is a child for business logic.
-	)
+	// otelgrpc interceptor already starts the span; this is a child for business logic.
+	ctx, span := otel.Tracer(tracerName).Start(ctx, "InventoryService.ReserveInventory")
 	defer span.End()
 
 	span.SetAttributes(attribute.String("order.id", req.GetOrderId()))
