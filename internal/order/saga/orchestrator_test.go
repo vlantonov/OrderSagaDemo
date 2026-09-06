@@ -3,6 +3,7 @@ package saga_test
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -166,6 +167,41 @@ func TestStartSagaPreservesEventID(t *testing.T) {
 	evt, ok := pub.published[0].payload.(messaging.OrderCreatedEvent)
 	require.True(t, ok, "published payload must be an OrderCreatedEvent")
 	assert.Equal(t, wantEventID, evt.EventID, "event_id must equal the caller-provided ID")
+}
+
+// TestCompensationOnInvalidQuantity verifies that an order whose item quantity is
+// out of int32 range fails buildReserveRequest inside OnPaymentProcessed. Since
+// payment has already been taken, the saga must transition to COMPENSATING and
+// publish CompensatePayment to release the payment (rather than stay stuck).
+func TestCompensationOnInvalidQuantity(t *testing.T) {
+	pub := &fakePublisher{}
+	inv := &fakeInventory{
+		resp: &inventoryv1.ReserveInventoryResponse{Success: true, ReservationId: "res-invalid"},
+	}
+	s := store.NewMemoryStore()
+	orch := newOrchestatorWithStore(t, s, pub, inv)
+	ctx := context.Background()
+
+	order := store.Order{
+		ID:            "order-invalidqty",
+		Items:         []store.Item{{ItemID: "item-A", Quantity: math.MaxInt32 + 1}},
+		PaymentAmount: 12.00,
+	}
+	require.NoError(t, orch.StartSaga(ctx, order, "evt-invalidqty"))
+	require.NoError(t, orch.OnPaymentProcessed(ctx, "order-invalidqty", "pay-invalidqty"))
+
+	o, err := s.Get("order-invalidqty")
+	require.NoError(t, err)
+	assert.Equal(t, store.StateCompensating, o.State,
+		"out-of-range quantity must trigger compensation, not a stuck RESERVING order")
+
+	// CompensatePayment must have been published to release the already-taken payment.
+	require.Len(t, pub.published, 2)
+	assert.Equal(t, "saga.payments.compensate", pub.published[1].topic)
+	evt, ok := pub.published[1].payload.(messaging.CompensatePaymentEvent)
+	require.True(t, ok, "published payload must be a CompensatePaymentEvent")
+	assert.Equal(t, "pay-invalidqty", evt.PaymentID, "compensation must release the taken payment")
+	assert.Contains(t, evt.Reason, "out of int32 range", "reason must reflect the invalid quantity")
 }
 
 // TestCompensationOnGRPCError verifies that a gRPC transport error (not a business
