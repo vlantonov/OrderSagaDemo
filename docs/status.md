@@ -1,8 +1,8 @@
 # Project Status — OrderSagaDemo
 
-**Version:** 0.2.0  
+**Version:** 0.5.0  
 **Date:** 2026-09-06  
-**Current stage:** Maintenance — two CI-regression fixes landed on `main` (lint, then vuln-install); docs updated (release of `v0.2.1` deferred)
+**Current stage:** Documentation — the Go 1.22 → 1.25 toolchain upgrade (ADR-003) shipped: coordinated `grpc` / OTel / `golang.org/x/net` dependency bumps, golangci-lint v1.60.3 → v2.13.2 migration (`golangci-lint-action@v9`), and `govulncheck ./...` down to **0 called vulnerabilities** (CI `vuln` gate now blocking). QA verdict **PASS-with-notes**; **D-3 retired**, ADR-001 **Done**, ADR-002 **Superseded**, ADR-003 **Done (amended)**
 
 ---
 
@@ -11,9 +11,9 @@
 | Stage | Status | Artefact |
 |-------|--------|---------|
 | Requirements | ✅ Complete | `docs/requirements/SRS.md` v0.1.0 |
-| Design | ✅ Complete | `docs/design/architecture.md` v0.1.0, `docs/design/project-layout.md` v0.1.0, `docs/tech-stack.md` v0.3.0 (ADR-002 recorded in §12) |
-| Implementation | ✅ Complete | Go 1.22 monorepo — three services, shared telemetry/messaging, gRPC stubs, Dockerfiles, Compose, Helm, Grafana dashboards |
-| QA | ✅ **PASS (with notes)** — D-3 accepted risk + one tracked test gap (see below) | Unit tests race-detector clean; golangci-lint PASS (re-fixed 2026-09-06); buf lint PASS; govulncheck non-blocking (install pinned to `@v1.1.4`, ADR-002) |
+| Design | ✅ Complete | `docs/design/architecture.md` v0.1.0, `docs/design/project-layout.md` v0.1.0, `docs/tech-stack.md` v0.5.0 (ADR-001 Done, ADR-002 Superseded, ADR-003 Done/amended in §12) |
+| Implementation | ✅ Complete | Go 1.25 monorepo — three services, shared telemetry/messaging, gRPC stubs, Dockerfiles, Compose, Helm, Grafana dashboards; deps `grpc v1.82.1` / OTel `v1.44.0` family / `x/net v0.58.0`; golangci-lint `v2.13.2` (`golangci-lint-action@v9`) |
+| QA | ✅ **PASS (with notes)** — gates green under Go 1.25 (0 called vulns, `vuln` gate blocking; lint green on v2.13.2); one tracked test gap (see below) | Unit tests race-detector clean; golangci-lint v2.13.2 PASS; buf lint PASS; `govulncheck ./...` **0 called vulnerabilities** (CI `vuln` job blocking) |
 | Release / CI-CD | ✅ Complete | `.github/workflows/ci.yml`, `.github/workflows/release.yml`; images pushed to GHCR on `v*.*.*` tags |
 | Documentation | ✅ Complete | `README.md`, `CHANGELOG.md`, `docs/ci-cd/pipeline.md`, `docs/status.md` (this file) |
 
@@ -31,7 +31,7 @@ A `semver(patch)` maintenance fix landed on `main` (commit `e5106c9`) restoring 
 **Tracked follow-ups (not lost):**
 
 1. **Non-blocking QA follow-up (test-only):** add a unit test covering the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path). QA verdict is **PASS-with-notes** on account of this gap.
-2. **Deferred stack decision — for System Architect:** fully clearing the Node-20 deprecation warning on the `lint` job requires bumping `golangci/golangci-lint-action` to v7/v8, which in turn requires golangci-lint `v1.60.x → v2` plus a `.golangci.yml` schema migration — a tech-stack change. Currently deferred; the action is left at `v6`.
+2. **Stack decision — RESOLVED (ADR-001 Done, 2026-09-06):** clearing the Node-20 warning on the `lint` job required golangci-lint `v1.60.x → v2` plus a `.golangci.yml` schema migration and `golangci-lint-action@v9`. Executed in the Go 1.25 upgrade pass below (forced early — golangci-lint v1.x cannot run under Go 1.25).
 
 ---
 
@@ -48,27 +48,63 @@ A `semver(patch)` maintenance fix landed on `main` (commit `866f49e`) restoring 
 
 ---
 
+## Architecture Decision — Go 1.25 Toolchain Bump (2026-09-06)
+
+A later CI `govulncheck ./...` run materially changed the accepted-risk picture: it reported **35 called vulnerabilities from 2 modules + the Go standard library**, up from the three D-3 items. Most are stdlib advisories fixed only in Go 1.25.x. This is the **third consecutive Go-1.22-rooted CI issue** in the session (after the lint fix and the ADR-002 govulncheck pin).
+
+**Ruling (System Architect):** **Option (B) — bump the Go toolchain to the latest Go 1.25.x patch (≥ go1.25.13)** as the root-cause fix, paired with dependency bumps (`grpc → v1.82.1`, OTel family `→ v1.43.0`, `golang.org/x/net → v0.36.0`). Recorded as **ADR-003** in `docs/tech-stack.md` §12. This **retires D-3**, **supersedes ADR-002** (govulncheck reverts to `@latest`), and **unblocks ADR-001** (linter v2 loses its Go-version obstacle). Options (A) hold-the-line/expand-D-3 and (C) partial dep-only bump were rejected — see the ADR-003 trade-off section.
+
+**This pass was decision + docs only** — the coupled source / `go.mod` / workflow changes were routed to a separate follow-up pass (ADR-003 scope). **That pass has since shipped — see the Maintenance Pass below.**
+
+---
+
+## Maintenance Pass — Go 1.25 Toolchain + Dependency & Linter Upgrade (2026-09-06)
+
+The ADR-003 ruling was executed as a single coordinated upgrade pass. It passed QA (**PASS-with-notes**) and is documented here in the AS-BUILT state. `VERSION` remains `0.2.0`; the version bump + tag + push is deferred to a separate release step. See the `[Unreleased]` **Fixed** / **Changed** / **Security** entries in `CHANGELOG.md` and `docs/tech-stack.md` §12 (**ADR-003**, amended) for full detail.
+
+- **Go toolchain bumped 1.22 → 1.25** — `go.mod` declares `go 1.25`; built/verified with `go1.25.13`. `actions/setup-go` `go-version` set to `1.25.13` across all CI jobs (`ci.yml`, `release.yml`); the three service Dockerfiles' builder image moved `golang:1.22-alpine → golang:1.25-alpine`. Root-cause fix for the expanded `govulncheck` findings (ADR-003).
+- **Coordinated dependency upgrades** — `google.golang.org/grpc v1.65.0 → v1.82.1`; the OpenTelemetry family `v1.29.0 → v1.44.0` (core/sdk/metric/trace/exporters, the paired `v0.20.0` log modules, and `contrib` `otelgrpc v0.54.0 → v0.69.0`); `golang.org/x/net v0.28.0 → v0.58.0`; `testify → v1.11.1` (transitive). No application-code API changes were required — the codebase already used the current `grpc.NewClient` and `otelgrpc.New{Client,Server}Handler` idioms.
+- **golangci-lint migrated v1.60.3 → v2.13.2 (ADR-001, executed early)** — golangci-lint v1.x cannot run under Go 1.25, so the migration was forced by the toolchain bump. `.golangci.yml` rewritten to the **v2 schema** (`version: "2"`, `linters.default: none`, same six linters `errcheck`/`govet`/`staticcheck`/`revive`/`gosec` plus `goimports` moved to the new `formatters` section with `local-prefixes` preserved). CI `golangci/golangci-lint-action@v6 → v9` (`v9.3.0`) — Node-24-native, which **clears the lingering Node-20 deprecation warning** on the `lint` job.
+- **gosec `//nolint:gosec` (G115) removed** — the newer gosec bundled in golangci-lint v2 recognises the preceding `[0, math.MaxInt32]` bounds check in `buildReserveRequest`, so the suppression is no longer needed; the runtime bounds check itself is retained.
+- **Security gate now blocking** — `govulncheck ./...` reports **0 called vulnerabilities** (down from 35); `continue-on-error: true` was dropped from the CI `vuln` job. The govulncheck install reverted to `@latest` (ADR-002 superseded — the `@v1.1.4` pin was a Go-1.22-era stopgap).
+
+**ADR status after this pass:** ADR-001 **Done**, ADR-002 **Superseded by ADR-003**, ADR-003 **Done (amended)**. **D-3 retired** (0 called vulns).
+
+**Tracked follow-up (not lost):** the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path) is still not unit-tested. QA also notes several packages (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) lack direct unit coverage — a known coverage gap, non-blocking for this pass.
+
+---
+
 ## QA Verdict
 
-**PASS (with notes)** — All blocking quality gates pass:
+**PASS (with notes)** — All blocking quality gates pass under Go 1.25:
 
 - `go build ./...` — clean
 - `go vet ./...` — clean
 - `go test -race -count=1 ./...` — clean (race detector enabled)
-- `golangci-lint run` — PASS (regressed and re-fixed in the 2026-09-06 maintenance pass above; now green)
+- `golangci-lint run ./...` — PASS on golangci-lint **v2.13.2** (v2 schema; `golangci-lint-action@v9`)
 - `buf lint` — PASS
+- `govulncheck ./...` — **0 called vulnerabilities**; the CI `vuln` job is now **blocking** (`continue-on-error` removed)
 
-*Note:* one non-blocking test gap is tracked — the out-of-range-quantity compensation branch in `buildReserveRequest` is not yet unit-tested (see Maintenance Pass follow-up 1).
+*Note:* test gaps are tracked (non-blocking) — the out-of-range-quantity compensation branch in `buildReserveRequest` is still not unit-tested (see Next Steps), and several packages (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) remain without direct unit coverage.
 
-**D-3 accepted risk** — `govulncheck` reports CVEs in transitive dependencies:
+**D-3 — RESOLVED (ADR-003 implemented, 2026-09-06).**
 
-| Advisory | Dependency | Decision |
-|---------|-----------|---------|
-| GO-2026-6061 | `google.golang.org/grpc v1.65.0` | Accepted — upstream fix pending; out of scope for this iteration |
-| GO-2026-5426 | `go.opentelemetry.io/otel/sdk v1.29.0` | Accepted — upstream fix pending; out of scope for this iteration |
-| GO-2026-\* (various) | Go 1.22.2 stdlib | Accepted — toolchain upgrade deferred |
+The Go 1.22 → 1.25 toolchain bump plus the coordinated dependency upgrades (`grpc v1.65.0 → v1.82.1`, the OTel family `v1.29.0 → v1.44.0`, `golang.org/x/net v0.28.0 → v0.58.0`) cleared **all 35 previously-called vulnerabilities**; `govulncheck ./...` now reports **0 called vulnerabilities**. The CI `vuln` job is therefore **blocking** (`continue-on-error: true` removed) and acts as a real quality gate.
 
-`govulncheck` runs in CI with `continue-on-error: true` so findings remain visible without blocking merges.
+*Historical note:* D-3 was previously an **accepted risk** — the grpc/otel/stdlib advisories were knowingly deferred behind the Go 1.22 pin while `govulncheck` ran non-blocking. That risk is now **retired**: it no longer applies (0 called vulns). The final called advisory, GO-2026-5158 (`go.opentelemetry.io/otel` baggage-header length cap), was cleared by advancing OTel one minor to `v1.44.0` (ADR-003 amendment).
+
+| Advisory (abridged) | Source | Fixed in | Cleared by |
+|---|---|---|---|
+| GO-2026-6091 / 6090 / 6089 / 5972 | stdlib (html/template, crypto/tls, net/http, encoding/asn1) | go1.25.13 | Go 1.25 bump |
+| GO-2026-5856 | stdlib crypto/tls | go1.25.12 | Go 1.25 bump |
+| GO-2026-5039 | stdlib net/textproto | go1.25.11 | Go 1.25 bump |
+| GO-2026-5037 | stdlib crypto/x509 | newer Go | Go 1.25 bump |
+| GO-2025-3503 | stdlib net/http + `golang.org/x/net v0.28.0` | go1.23.7 / x/net v0.36.0 | Go bump + `x/net v0.58.0` |
+| GO-2026-6061 | `google.golang.org/grpc v1.65.0` | v1.82.1 | grpc bump |
+| GO-2026-5426 | `go.opentelemetry.io/otel/sdk v1.29.0` | v1.43.0 | OTel bump |
+| GO-2026-5158 | `go.opentelemetry.io/otel v1.43.0` | v1.44.0 | OTel v1.44.0 (ADR-003 amendment) |
+
+All advisories above are now cleared; `govulncheck ./...` is clean and the CI gate is blocking.
 
 ---
 
@@ -115,7 +151,11 @@ All previously flagged stale references have been corrected by the Technical Wri
 
 ## Next Steps
 
-1. **Release step** — bump `VERSION` to `0.2.1`, tag `v0.2.1`, and push to trigger the release workflow (deferred from the 2026-09-06 maintenance pass; `VERSION` currently stays `0.2.0`).
-2. **QA follow-up (test-only)** — add the missing unit test for the out-of-range-quantity compensation branch in `buildReserveRequest` (Maintenance Pass follow-up 1).
-3. **System Architect decision** — evaluate the golangci-lint `v1.60.x → v2` + `.golangci.yml` migration needed to bump `golangci/golangci-lint-action` to v7/v8 and clear the remaining Node-20 warning on the `lint` job (Maintenance Pass follow-up 2).
-4. **Optional** — upgrade `grpc` and `otel/sdk` once upstream patches are available; re-enable blocking `govulncheck` in CI.
+1. **Release step** — bump `VERSION`, tag, and push to trigger the release workflow (deferred; `VERSION` currently stays `0.2.0`). The version bump for the Go 1.25 + dependency + linter upgrade is a separate release decision.
+2. **QA follow-up (test-only)** — add the missing unit test for the out-of-range-quantity compensation branch in `buildReserveRequest` (error → compensation path). **Still open.**
+3. **Coverage gap (test-only, non-blocking)** — add direct unit coverage for `telemetry`, the inventory gRPC server, the Kafka consumers, and `cmd/*`, which QA flagged as untested.
+
+**Resolved (no longer open):**
+
+- **Go 1.25 bump (ADR-003)** — shipped; see the Maintenance Pass above. `govulncheck ./...` clean, all gates green, D-3 retired, ADR-002 superseded.
+- **golangci-lint v1 → v2 (ADR-001)** — shipped (`v2.13.2` + `golangci-lint-action@v9`); the Node-20 deprecation warning on the `lint` job is cleared.

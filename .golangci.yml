@@ -1,19 +1,37 @@
 # golangci-lint configuration
-# Linters listed in docs/tech-stack.md (v1.60.x)
-
-run:
-  timeout: 5m
-
+# Schema v2 (migrated from v1.60.x — see docs/tech-stack.md §2 / ADR-001).
+# Linters enabled (six, unchanged): errcheck, govet, staticcheck, revive, gosec,
+# and goimports (moved to the v2 `formatters` section).
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
-    - govet
-    - staticcheck
-    - goimports
-    - revive
     - gosec
-
-linters-settings:
-  goimports:
-    local-prefixes: github.com/vladiant/ordersagademo
+    - govet
+    - revive
+    - staticcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/vladiant/ordersagademo
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

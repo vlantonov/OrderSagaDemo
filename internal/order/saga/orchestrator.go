@@ -258,9 +258,8 @@ func buildReserveRequest(order store.Order) (*inventoryv1.ReserveInventoryReques
 		}
 		items[i] = &inventoryv1.ItemQuantity{
 			ItemId: it.ItemID,
-			// qty is bounds-checked to [0, math.MaxInt32] above; gosec v2.20 (G115)
-			// cannot see the guard, so the conversion is safe despite the finding.
-			Quantity: int32(qty), //nolint:gosec // G115: guarded by the range check above
+			// qty is bounds-checked to [0, math.MaxInt32] above.
+			Quantity: int32(qty),
 		}
 	}
 	return &inventoryv1.ReserveInventoryRequest{
