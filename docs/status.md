@@ -1,8 +1,8 @@
 # Project Status — OrderSagaDemo
 
-**Version:** 0.5.0  
+**Released version:** v0.2.1 (released 2026-09-06, tag `v0.2.1` on GitHub + GitLab, release commit `7d1f5c9`; `VERSION` = `0.2.1`)  
 **Date:** 2026-09-06  
-**Current stage:** Documentation — the Go 1.22 → 1.25 toolchain upgrade (ADR-003) shipped: coordinated `grpc` / OTel / `golang.org/x/net` dependency bumps, golangci-lint v1.60.3 → v2.13.2 migration (`golangci-lint-action@v9`), and `govulncheck ./...` down to **0 called vulnerabilities** (CI `vuln` gate now blocking). QA verdict **PASS-with-notes**; **D-3 retired**, ADR-001 **Done**, ADR-002 **Superseded**, ADR-003 **Done (amended)**
+**Current stage:** Documentation — **v0.2.1 is released and published**: CI is green on `main` (all four jobs — `Build · Vet · Test`, `golangci-lint` v2.13.2/`action@v9`, blocking `govulncheck`, `buf lint`) and the GHCR release workflow succeeded, pushing the three service images (`ghcr.io/vladiant/ordersagademo-{order,payment,inventory}`) for the `v0.2.1` tag. This release bundles the full maintenance batch (goimports/gosec lint fixes, CI action bumps, Go 1.22 → 1.25 upgrade with coordinated `grpc` / OTel / `golang.org/x/net` bumps, golangci-lint v1.60.3 → v2.13.2 migration, `govulncheck` 35 → **0 called vulnerabilities** with the CI `vuln` gate now blocking, D-3 retired, and the compensation-branch test). QA verdict **PASS-with-notes**; **D-3 retired**, ADR-001 **Done**, ADR-002 **Superseded**, ADR-003 **Done (amended)**
 
 ---
 
@@ -14,7 +14,7 @@
 | Design | ✅ Complete | `docs/design/architecture.md` v0.1.0, `docs/design/project-layout.md` v0.1.0, `docs/tech-stack.md` v0.5.0 (ADR-001 Done, ADR-002 Superseded, ADR-003 Done/amended in §12) |
 | Implementation | ✅ Complete | Go 1.25 monorepo — three services, shared telemetry/messaging, gRPC stubs, Dockerfiles, Compose, Helm, Grafana dashboards; deps `grpc v1.82.1` / OTel `v1.44.0` family / `x/net v0.58.0`; golangci-lint `v2.13.2` (`golangci-lint-action@v9`) |
 | QA | ✅ **PASS (with notes)** — gates green under Go 1.25 (0 called vulns, `vuln` gate blocking; lint green on v2.13.2); one tracked test gap (see below) | Unit tests race-detector clean; golangci-lint v2.13.2 PASS; buf lint PASS; `govulncheck ./...` **0 called vulnerabilities** (CI `vuln` job blocking) |
-| Release / CI-CD | ✅ Complete | `.github/workflows/ci.yml`, `.github/workflows/release.yml`; images pushed to GHCR on `v*.*.*` tags |
+| Release / CI-CD | ✅ **Released — v0.2.1 (2026-09-06)** | `.github/workflows/ci.yml`, `.github/workflows/release.yml`; CI green on `main`, GHCR release workflow succeeded — `ghcr.io/vladiant/ordersagademo-{order,payment,inventory}` pushed for the `v0.2.1` tag; annotated tag `v0.2.1` on GitHub + GitLab |
 | Documentation | ✅ Complete | `README.md`, `CHANGELOG.md`, `docs/ci-cd/pipeline.md`, `docs/status.md` (this file) |
 
 ---
@@ -80,7 +80,15 @@ A test-only change landed on `main` (commit `e9ede1f`): `TestCompensationOnInval
 
 ---
 
-## QA Verdict
+## Release — v0.2.1 Published (2026-09-06)
+
+The deferred release step shipped. A `semver(patch)` bump landed on `main` (commit `7d1f5c9`, `semver(patch): bump version to 0.2.1`); `VERSION` now reads `0.2.1`, and the annotated tag `v0.2.1` was pushed to **both GitHub and GitLab**. CHANGELOG is now structured with `[0.2.1]` and `[0.2.0]` sections (the former `[Unreleased]` batch promoted). This release bundles the full maintenance batch documented in the passes above: goimports/gosec lint fixes, CI action bumps, the Go 1.22 → 1.25 toolchain upgrade with coordinated `grpc` / OTel / `golang.org/x/net` upgrades, the golangci-lint v1 → v2 migration, `govulncheck` 35 → 0 called vulnerabilities (vuln gate now blocking), D-3 retirement, and the compensation-branch test.
+
+- **CI green on the release** — all four `main` jobs passed: `Build · Vet · Test`, `golangci-lint` v2.13.2 (`golangci-lint-action@v9`), blocking `govulncheck`, and `buf lint`.
+- **GHCR images published** — the release workflow run completed successfully, building and pushing `ghcr.io/vladiant/ordersagademo-{order,payment,inventory}` for the `v0.2.1` tag.
+- **Remaining open item (honest):** the broader multi-package unit-test coverage gap (`telemetry`, the inventory gRPC server, the Kafka consumers, `cmd/*`) is still open and **non-blocking**. The specific compensation-branch gap remains **resolved** (`TestCompensationOnInvalidQuantity`).
+
+---
 
 **PASS (with notes)** — All blocking quality gates pass under Go 1.25:
 
@@ -157,11 +165,11 @@ All previously flagged stale references have been corrected by the Technical Wri
 
 ## Next Steps
 
-1. **Release step** — bump `VERSION`, tag, and push to trigger the release workflow (deferred; `VERSION` currently stays `0.2.0`). The version bump for the Go 1.25 + dependency + linter upgrade is a separate release decision.
-2. **Coverage gap (test-only, non-blocking)** — add direct unit coverage for `telemetry`, the inventory gRPC server, the Kafka consumers (`internal/order/kafka`, `internal/payment/kafka`), and `cmd/*/main.go` (compilation-only today), which QA flagged as untested.
+1. **Coverage gap (test-only, non-blocking)** — add direct unit coverage for `telemetry`, the inventory gRPC server, the Kafka consumers (`internal/order/kafka`, `internal/payment/kafka`), and `cmd/*/main.go` (compilation-only today), which QA flagged as untested.
 
 **Resolved (no longer open):**
 
+- **Release step — v0.2.1 published (2026-09-06)** — `VERSION` bumped to `0.2.1` (commit `7d1f5c9`), annotated tag `v0.2.1` pushed to GitHub + GitLab, CI green, and the GHCR release workflow pushed the three service images for the tag. See the Release pass above.
 - **QA follow-up (test-only) — out-of-range-quantity compensation branch** — RESOLVED (2026-09-06). The error → compensation path in `buildReserveRequest` is now covered by `TestCompensationOnInvalidQuantity` in `internal/order/saga/orchestrator_test.go` (commit `e9ede1f`). This closes the specific coverage-gap follow-up tracked since the CI lint-regression fix; the broader multi-package coverage gap above remains open and distinct.
 - **Go 1.25 bump (ADR-003)** — shipped; see the Maintenance Pass above. `govulncheck ./...` clean, all gates green, D-3 retired, ADR-002 superseded.
 - **golangci-lint v1 → v2 (ADR-001)** — shipped (`v2.13.2` + `golangci-lint-action@v9`); the Node-20 deprecation warning on the `lint` job is cleared.
