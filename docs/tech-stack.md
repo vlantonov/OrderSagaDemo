@@ -1,6 +1,6 @@
 # Tech Stack — OrderSagaDemo
 
-**Version:** 0.1.0  
+**Version:** 0.2.0  
 **Date:** 2026-09-06  
 **Owner:** System Architect  
 
@@ -24,7 +24,7 @@
 | Go dependency manager | **Go modules** (`go mod`) | Built into Go 1.22; `go.sum` committed. |
 | Proto toolchain | **buf** | `v1.35.x`; handles `buf lint`, `buf generate`, and breaking-change detection. |
 | Proto plugins (buf-managed) | `protoc-gen-go` v1.34, `protoc-gen-go-grpc` v1.4 | Declared in `buf.gen.yaml`; no system-level `protoc` required. |
-| Linter | **golangci-lint** | `v1.60.x`; config in `.golangci.yml` at repo root. Enabled linters: `errcheck`, `govet`, `staticcheck`, `goimports`, `revive`, `gosec`. |
+| Linter | **golangci-lint** | **Active pin: `v1.60.x`** (config schema v1) via `golangci-lint-action@v6`; config in `.golangci.yml` at repo root. Enabled linters: `errcheck`, `govet`, `staticcheck`, `goimports`, `revive`, `gosec`. Migration to **golangci-lint v2** (+ `golangci-lint-action@v7/v8`) is **approved-but-scheduled** — see §12 ADR-001. |
 | Security scan | **govulncheck** | `latest` via `go install golang.org/x/vuln/cmd/govulncheck@latest`; run in `make vuln`. |
 | Formatter | `gofmt` / `goimports` | Enforced by golangci-lint; no separate step needed. |
 
@@ -145,3 +145,29 @@ The QA Engineer must be able to run all of the following without any setup beyon
 | `compose-down` | `make compose-down` | `docker compose … down -v` |
 | `test-integration` | `make test-integration` | Runs integration test suite (requires Docker) |
 | `kind-deploy` | `make kind-deploy` | Creates kind cluster, loads images, applies manifests |
+
+---
+
+## 12. Deferred / Pending Decisions (ADRs)
+
+### ADR-001 — golangci-lint v1 → v2 migration (Node-20 deprecation on the `lint` job)
+
+**Date:** 2026-09-06 **Owner:** System Architect **Status:** ✅ Approved — **Scheduled** (deferred)
+
+**Context.** CI emits `"Node 20 is being deprecated. This workflow is running with Node 24 by default."` from the `golangci/golangci-lint-action@v6` step. The 2026-09-06 maintenance pass moved `actions/checkout@v4→v5` and `actions/setup-go@v5→v6` (both Node-24-native) but intentionally left the linter action at `v6`, because clearing the warning on the `lint` job requires `golangci-lint-action@v7/v8`, and those majors **require golangci-lint v2**. golangci-lint v2 uses a **different `.golangci.yml` schema** and reorganises some linter settings, so this is a toolchain + config-migration change, not a drop-in bump — an architecture-owned decision.
+
+**Decision.** **golangci-lint v2** (with `golangci-lint-action@v7` or `v8`, whichever is current at implementation time) is the **approved target** stack for linting. Adoption is **deferred**: the project stays on **golangci-lint v1.60.x + `golangci-lint-action@v6`** until the Node-20 removal is announced or imminent (i.e., while the runner default remains Node 24 and the message is a non-blocking deprecation notice).
+
+**Rationale / trade-off.**
+- The warning is a **deprecation notice, not a failure** — the `lint` job is green and already runs on Node 24. No current functional impact.
+- The v1→v2 migration carries **real churn and risk** — a config schema rewrite plus re-verification that the six enabled linters behave equivalently, with the possibility of new/changed findings across the codebase — for **no reviewer-visible benefit today**.
+- Node-20 removal is nonetheless **certain**, so pinning v2 as the authoritative target avoids re-litigating the decision and keeps the doc internally consistent. Alternative (A) *migrate now* was rejected as premature churn; alternative (C) *decline* was rejected because it loses the reasoning and leaves the pin non-authoritative.
+
+**Trigger to execute.** Any of: (a) GitHub announces a removal date for Node-20 action support; (b) the runner default flips such that the deprecation becomes an error; (c) an unrelated need to adopt a v2-only linter feature.
+
+**Migration scope (for the future Maintenance/Developer pass — do NOT implement now):**
+- **Config:** rewrite `.golangci.yml` to the **golangci-lint v2 schema** (v2 reorganises the top-level structure and moves several `linters-settings`; preserve `disable-all` + the same six enabled linters `errcheck`, `govet`, `staticcheck`, `goimports`, `revive`, `gosec`, and the `goimports.local-prefixes: github.com/vladiant/ordersagademo` setting under its v2 equivalent). Consider `golangci-lint migrate` if available to bootstrap the conversion, then hand-verify.
+- **Toolchain pin:** update §2 of this doc to the concrete golangci-lint `v2.x` version and the chosen `golangci-lint-action@v7/v8`.
+- **CI:** bump `golangci/golangci-lint-action@v6 → v7/v8` in `.github/workflows/ci.yml` (and `release.yml` if it runs lint); confirm the Node-20 warning is gone.
+- **gosec re-check (verify, don't assume):** v2 bundles a newer gosec that *may* change G115 behaviour. Re-evaluate whether the justified `//nolint:gosec` on the bounds-checked `int → int32` conversion in `buildReserveRequest` (saga reserve step) can be removed, and re-triage any newly surfaced findings before enabling.
+- **Acceptance criteria:** `make lint` (`golangci-lint run ./...`) passes clean on the v2 toolchain; no new suppressed findings introduced without written justification; the `lint` CI job runs without the Node-20 deprecation warning; §2 + this ADR updated to reflect the shipped versions and `Status: Done`.
